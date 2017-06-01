@@ -63,7 +63,7 @@ if __name__ == '__main__':
     bridge = CvBridge()
     record_rgb_and_depth(args.n_secs)
 
-    h5_file = h5py.File("data/hdf5/" + args.h5 + ".h5", "a")
+    h5_file = h5py.File(args.h5, "a")
 
     # Save rgb data to hdf5 file
     rgb_frames = np.array(rgb_frames)

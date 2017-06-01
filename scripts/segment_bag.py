@@ -19,8 +19,6 @@ from sensor_msgs.msg import CameraInfo
 
 BBox = namedtuple('BBox', ['min', 'max'])
 
-kDataPath = '/home/ur5/external/warthog/data/'
-
 def main(jobname, depth_frames, bgr_frames, frames_range):
     # Construct Camera model to convert from 3d points to 2d points
     cam_info = CameraInfo()
@@ -276,8 +274,12 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("h5", type=str, help="The h5 file containing the point cloud")
     parser.add_argument("jobname", type=str, help="The jobname to run the segmentation on")
+    parser.add_argument("datapath", type=str, help="The path to the data to be utilized")
     parser.add_argument("-n", dest='n', type=int, default=-1, help="The desired rgb frame number, or -1 (default) for all")
     args = parser.parse_args()
+
+    #kDataPath = '/home/ur5/external/warthog/data/'
+    kDataPath = args.datapath
 
     # Get desired frame from number
     h5_file = h5py.File(kDataPath + args.h5 + '.h5', 'r')
