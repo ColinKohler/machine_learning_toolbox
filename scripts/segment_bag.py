@@ -22,7 +22,7 @@ BBox = namedtuple('BBox', ['min', 'max'])
 def main(jobname, depth_frames, bgr_frames, frames_range):
     # Construct Camera model to convert from 3d points to 2d points
     cam_info = CameraInfo()
-    with open('hdf5/camera_info.txt', 'r') as fd:
+    with open(kDataPath + 'hdf5/camera_info.txt', 'r') as fd:
         cam_data = fd.read()
     cam_info.deserialize(cam_data)
     cam_model = PinholeCameraModel()
@@ -282,7 +282,7 @@ if __name__ == '__main__':
     kDataPath = args.datapath
 
     # Get desired frame from number
-    h5_file = h5py.File(kDataPath + args.h5 + '.h5', 'r')
+    h5_file = h5py.File(kDataPath + 'hdf5/' + args.h5 + '.h5', 'r')
     depth_frames = h5_file[args.jobname + '_depth']
     bgr_frames = h5_file[args.jobname + '_rgb']
 
