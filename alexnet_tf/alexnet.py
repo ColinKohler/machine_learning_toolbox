@@ -2,12 +2,13 @@ import sys
 import tensorflow as tf
 import numpy as np
 
+WEIGHTS_PATH = '/home/colin/workspace/machine_learning_toolbox/alexnet_tf/bvlc_alexnet.npy'
+
 class AlexNet(object):
-    def __init__(self, x, keep_prob, output_num, skip_layer, weights_path='bvlc_alexnet.npy'):
+    def __init__(self, x, keep_prob, output_num, skip_layer):
         self.x = x
         self.keep_prob = keep_prob
         self.skip_layer = skip_layer
-        self.weights_path = weights_path
         self.output_num = output_num
 
         self.createModel()
@@ -36,8 +37,9 @@ class AlexNet(object):
 
         self.fc8 = self.fc(dropout7, 4096, self.output_num, relu=False, name='fc8')
 
+    # Load weights from bvlc_alexnet.npy (Caffe weights)
     def loadInitialWeights(self, session):
-        weights_dict = np.load(self.weights_path, encoding='bytes').item()
+        weights_dict = np.load(WEIGHTS_PATH, encoding='bytes').item()
         for op_name in weights_dict:
             if op_name not in self.skip_layer:
                 with tf.variable_scope(op_name, reuse=True):
