@@ -1,12 +1,12 @@
 import sys, os
-sys.path.append('/home/colin/workspace/machine_learning_tools/')
+sys.path.append('/home/colin/workspace/machine_learning_toolbox/')
 import numpy as np
 import tensorflow as tf
 from datetime import datetime
 from alexnet_tf.alexnet import AlexNet
 from utils.percept_importer import PerceptImporter
 
-dir_path = '/home/colin/workspace/machine_learning_tools/'
+dir_path = '/home/colin/workspace/machine_learning_toolbox/'
 
 # Percepts
 train_file = dir_path + 'metadata/trash_bag_train.json'
@@ -35,13 +35,13 @@ y = tf.placeholder(tf.float32, [None, num_output])
 keep_prob = tf.placeholder(tf.float32)
 
 # Init model and connect output to last layer
-model = AlexNet(x, keep_prob, num_output, train_layers, weights_path=dir_path+'alexnet_tf/bvlc_alexnet.npy')
+model = AlexNet(x, keep_prob, num_output, train_layers)
 output = model.fc8
 var_list = [v for v in tf.trainable_variables() if v.name.split('/')[0] in train_layers]
 
 # Setup loss function
 with tf.name_scope("loss"):
-    loss = tf.nn.l2_loss(output - y) / 10000
+    loss = tf.reduce_mean(tf.nn.l2_loss(output - y))
 
 # Train Op
 with tf.name_scope('train'):
@@ -85,8 +85,8 @@ merged_summary = tf.summary.merge_all()
 writer = tf.summary.FileWriter(filewriter_path)
 saver = tf.train.Saver()
 
-train_importer = PerceptImporter(train_file, batch_size, [0.0, 0.0, 0.0])
-val_importer = PerceptImporter(val_file, batch_size, [0.0, 0.0, 0.0])
+train_importer = PerceptImporter(train_file, num_output, batch_size, [0.0, 0.0, 0.0])
+val_importer = PerceptImporter(val_file, num_output, batch_size, [0.0, 0.0, 0.0])
 train_batches_per_epoch = np.floor(train_importer.num_percepts / batch_size).astype(np.int16)
 val_batches_per_epoch = np.floor(val_importer.num_percepts / batch_size).astype(np.int16)
 
@@ -107,7 +107,7 @@ with tf.Session(config=config) as sess:
         step = 1
         # Train
         while step < train_batches_per_epoch:
-            batch_xs, batch_ys = train_importer.getBatch(0)
+            batch_xs, batch_ys = train_importer.getBatch(cls=False)
             sess.run(train_op, feed_dict={x : batch_xs, y : batch_ys, keep_prob : dropout_prob})
 
             if step%display_step == 0:
@@ -122,7 +122,7 @@ with tf.Session(config=config) as sess:
         test_acc = 0.0
         test_count = 0
         for _ in range(val_batches_per_epoch):
-            tbatch_xs, tbatch_ys = val_importer.getBatch(0)
+            tbatch_xs, tbatch_ys = val_importer.getBatch(cls=False)
             acc = sess.run(accuracy, feed_dict={x : tbatch_xs, y : tbatch_ys, keep_prob : 1.0})
             test_acc += acc
             test_count += 1

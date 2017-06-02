@@ -1,12 +1,12 @@
 import sys, os
-sys.path.append('/home/colin/workspace/machine_learning_tools/')
+sys.path.append('/home/colin/workspace/machine_learning_toolbox/')
 import numpy as np
 import tensorflow as tf
 from datetime import datetime
 from alexnet_tf.alexnet import AlexNet
 from utils.percept_importer import PerceptImporter
 
-dir_path = '/home/colin/workspace/machine_learning_tools/'
+dir_path = '/home/colin/workspace/machine_learning_toolbox/'
 
 # Percepts
 train_file = dir_path + 'metadata/trash_bag_train.json'
@@ -35,7 +35,7 @@ y = tf.placeholder(tf.float32, [None, num_output])
 keep_prob = tf.placeholder(tf.float32)
 
 # Init model and connect output to last layer
-model = AlexNet(x, keep_prob, num_output, train_layers, weights_path=dir_path+'alexnet_tf/bvlc_alexnet.npy')
+model = AlexNet(x, keep_prob, num_output, train_layers)
 output = model.fc8
 var_list = [v for v in tf.trainable_variables() if v.name.split('/')[0] in train_layers]
 
