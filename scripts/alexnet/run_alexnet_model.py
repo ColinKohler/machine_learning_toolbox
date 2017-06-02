@@ -1,3 +1,5 @@
+import sys, os
+sys.path.append('/home/colin/workspace/machine_learning_tools/')
 import tensorflow as tf
 import argparse
 import cv2
@@ -14,7 +16,7 @@ def main():
     img = cv2.resize(img, (227, 227))
     img = img.astype(np.float32)
 
-    num_output = 2
+    num_output = 4
     train_layers = []
 
     # TensorFlow stuff
@@ -34,7 +36,7 @@ def main():
         sess.run(tf.global_variables_initializer())
         saver.restore(sess, args.model_path)
 
-        best = sess.run(pred, feed_dict={x : img.reshape([1, 227, 227, 3]), keep_prob : 1.0})
+        best = sess.run(output, feed_dict={x : img.reshape([1, 227, 227, 3]), keep_prob : 1.0})
         print best
 
 if __name__ == '__main__':
