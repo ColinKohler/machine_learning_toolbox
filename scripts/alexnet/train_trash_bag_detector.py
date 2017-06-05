@@ -4,7 +4,7 @@ import numpy as np
 import tensorflow as tf
 from datetime import datetime
 from alexnet_tf.alexnet import AlexNet
-from utils.percept_importer import PerceptImporter
+from utils.rigor_percept_importer import RigorPerceptImporter
 
 dir_path = '/home/colin/workspace/machine_learning_toolbox/'
 
@@ -85,8 +85,8 @@ merged_summary = tf.summary.merge_all()
 writer = tf.summary.FileWriter(filewriter_path)
 saver = tf.train.Saver()
 
-train_importer = PerceptImporter(train_file, num_output, batch_size, [0.0, 0.0, 0.0])
-val_importer = PerceptImporter(val_file, num_output, batch_size, [0.0, 0.0, 0.0])
+train_importer = RigorPerceptImporter(train_file, num_output, batch_size, [0.0, 0.0, 0.0])
+val_importer = RigorPerceptImporter(val_file, num_output, batch_size, [0.0, 0.0, 0.0])
 train_batches_per_epoch = np.floor(train_importer.num_percepts / batch_size).astype(np.int16)
 val_batches_per_epoch = np.floor(val_importer.num_percepts / batch_size).astype(np.int16)
 
