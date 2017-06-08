@@ -107,7 +107,7 @@ with tf.Session(config=config) as sess:
         step = 1
         # Train
         while step < train_batches_per_epoch:
-            batch_xs, batch_ys = train_importer.getBatch(cls=False)
+            batch_xs, batch_ys = train_importer.getBatch()
             sess.run(train_op, feed_dict={x : batch_xs, y : batch_ys, keep_prob : dropout_prob})
 
             if step%display_step == 0:

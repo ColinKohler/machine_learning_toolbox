@@ -19,7 +19,7 @@ from sensor_msgs.msg import CameraInfo
 
 BBox = namedtuple('BBox', ['min', 'max'])
 
-def main(jobname, depth_frames, bgr_frames, frames_range):
+def main(jobname, depth_frames, bgr_frames, frames_range, segment=True):
     # Construct Camera model to convert from 3d points to 2d points
     cam_info = CameraInfo()
     with open(kDataPath + 'hdf5/camera_info.txt', 'r') as fd:
@@ -31,25 +31,26 @@ def main(jobname, depth_frames, bgr_frames, frames_range):
     # Loop through desired frames
     bbox_areas = list(); percepts = list()
     for i in frames_range:
-        print "Segmenting Frame {}...".format(i)
-
         # Get frames and convert BGR frame to rgb
         depth_frame = depth_frames[i]
         bgr_frame = bgr_frames[i]
         rgb_frame = cv2.cvtColor(bgr_frame, cv2.COLOR_BGR2RGB)
 
-        # Get point cloud out of depth frame
-        num_points = depth_frame.shape[0] / 3
-        cloud = depth_frame.reshape((num_points, 3))
-        cloud = pcl.PointCloud(cloud.astype(np.float32))
+        if segment:
+            print "Segmenting Frame {}...".format(i)
 
-        # Segment bag and convert 3d points to 2d
-        bag_cloud = segment_bag_from_cloud(cloud)
-        bbox = get_cloud_limits(bag_cloud, cam_model)
-        valid, bbox_areas = validate_bbox(bbox, bbox_areas)
-        if not valid:
-            print "Rejecting frame due to bad bounding box..."
-            continue
+            # Get point cloud out of depth frame
+            num_points = depth_frame.shape[0] / 3
+            cloud = depth_frame.reshape((num_points, 3))
+            cloud = pcl.PointCloud(cloud.astype(np.float32))
+
+            # Segment bag and convert 3d points to 2d
+            bag_cloud = segment_bag_from_cloud(cloud)
+            bbox = get_cloud_limits(bag_cloud, cam_model)
+            valid, bbox_areas = validate_bbox(bbox, bbox_areas)
+            if not valid:
+                print "Rejecting frame due to bad bounding box..."
+                continue
 
         # Augment data
         percepts = augment_percept(jobname, rgb_frame, i, bbox, percepts)
@@ -169,7 +170,8 @@ def create_percept(filepath, dset, frame, bbox):
             [bbox.max[0], bbox.min[1]],
             [bbox.max[0], bbox.max[1]],
             [bbox.min[0], bbox.max[1]]]
-    percept['annotations'] = [{'domain' : 'warthog',
+    percept['annotations'] = [{'domain' : 'trash',
+                               'model' : 'trash.bag'
                                'confidence': 1,
                                'boundary' : bbox,
                                'annotation_tags' : ['auto.segmented']}]
@@ -276,6 +278,9 @@ if __name__ == '__main__':
     parser.add_argument("jobname", type=str, help="The jobname to run the segmentation on")
     parser.add_argument("datapath", type=str, help="The path to the data to be utilized")
     parser.add_argument("-n", dest='n', type=int, default=-1, help="The desired rgb frame number, or -1 (default) for all")
+    parser.add_argument("-seg", dest='segment', action='store_true')
+    parser.add_argument("-no-seg", dest='segment', action='store_false')
+    parser.set_defaults(segment=True)
     args = parser.parse_args()
 
     #kDataPath = '/home/ur5/external/warthog/data/'
@@ -292,4 +297,4 @@ if __name__ == '__main__':
     else:
         frames_range = range(args.n, args.n+1)
 
-    main(args.jobname, depth_frames, bgr_frames, frames_range)
+    main(args.jobname, depth_frames, bgr_frames, frames_range, args.segment)

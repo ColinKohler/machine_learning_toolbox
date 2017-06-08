@@ -54,7 +54,7 @@ class RigorPerceptImporter(object):
 
     # Get the bounding box as [x1, y1, x2, y2]
     def getBBoxFromAnnotation(self, annotation):
-        bbox = percept['annotations'][0]['boundary']
+        bbox = annotations['boundary']
         return [bbox[0][0], bbox[0][1], bbox[2][0], bbox[2][1]]
 
     # Shuffles data if desired
