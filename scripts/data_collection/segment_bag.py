@@ -19,10 +19,10 @@ from sensor_msgs.msg import CameraInfo
 
 BBox = namedtuple('BBox', ['min', 'max'])
 
-def main(jobname, depth_frames, bgr_frames, frames_range, segment=True):
+def main(seg, jobname, depth_frames, bgr_frames, frames_range):
     # Construct Camera model to convert from 3d points to 2d points
     cam_info = CameraInfo()
-    with open(kDataPath + 'hdf5/camera_info.txt', 'r') as fd:
+    with open(DATA_PATH + 'hdf5/camera_info.txt', 'r') as fd:
         cam_data = fd.read()
     cam_info.deserialize(cam_data)
     cam_model = PinholeCameraModel()
@@ -36,7 +36,8 @@ def main(jobname, depth_frames, bgr_frames, frames_range, segment=True):
         bgr_frame = bgr_frames[i]
         rgb_frame = cv2.cvtColor(bgr_frame, cv2.COLOR_BGR2RGB)
 
-        if segment:
+        # Segment the closest object out and create its bounding box
+        if seg:
             print "Segmenting Frame {}...".format(i)
 
             # Get point cloud out of depth frame
@@ -51,12 +52,16 @@ def main(jobname, depth_frames, bgr_frames, frames_range, segment=True):
             if not valid:
                 print "Rejecting frame due to bad bounding box..."
                 continue
+        else:
+            bbox = None
 
         # Augment data
+        print "Augmenting Frame {}...".format(i)
         percepts = augment_percept(jobname, rgb_frame, i, bbox, percepts)
 
     # Save percepts
-    with open(jobname + '_percepts.json', 'w') as p_file:
+    percepts_path = DATA_PATH + 'metadata/' + jobname + '_percepts.json'
+    with open(percepts_path, 'w') as p_file:
         json.dump(percepts, p_file)
 
 # Segment bag from point cloud
@@ -100,18 +105,17 @@ def segment_bag_from_cloud(cloud):
     return bag_cloud
 
 # Augment percepts for use in training
-def augment_percept(jobname, rgb_frame, img_num, bbox, percepts, n_augments=10):
+def augment_percept(jobname, rgb_frame, img_num, bbox, percepts):
     # Crop out 80 pixels on each side and resize the image to 256x256
     rgb_frame, bbox = crop_image_lr(rgb_frame, bbox, 80)
     rgb_frame, bbox = resize_image(rgb_frame, bbox)
     frame_size = rgb_frame.shape[0]
 
     # Apply random perturbations to the image
-    for i in range(n_augments):
+    for i in range(NUM_AUGMENTS):
         # Flip image half the time
         if np.random.random_sample() >= 0.5:
             frame, bbox_tmp = flip_image(rgb_frame, bbox)
-            bbox_tmp = BBox(create_h_point(bbox_tmp.min), create_h_point(bbox_tmp.max))
         else:
             frame = rgb_frame
             bbox_tmp = bbox
@@ -129,12 +133,13 @@ def augment_percept(jobname, rgb_frame, img_num, bbox, percepts, n_augments=10):
 
         # Transform the image and the bounding box
         frame = cv2.warpAffine(frame, H, (frame_size, frame_size))
-        bbox_tmp = BBox(create_h_point(bbox_tmp.min), create_h_point(bbox_tmp.max))
-        min_bbox_tmp = H.dot(bbox_tmp.min)
-        max_bbox_tmp = H.dot(bbox_tmp.max)
-        min_bbox_tmp = [round(min_bbox_tmp[0]), round(min_bbox_tmp[1])]
-        max_bbox_tmp = [round(max_bbox_tmp[0]), round(max_bbox_tmp[1])]
-        bbox_tmp = BBox(min_bbox_tmp, max_bbox_tmp)
+        if bbox_tmp:
+            bbox_tmp = BBox(create_h_point(bbox_tmp.min), create_h_point(bbox_tmp.max))
+            min_bbox_tmp = H.dot(bbox_tmp.min)
+            max_bbox_tmp = H.dot(bbox_tmp.max)
+            min_bbox_tmp = [round(min_bbox_tmp[0]), round(min_bbox_tmp[1])]
+            max_bbox_tmp = [round(max_bbox_tmp[0]), round(max_bbox_tmp[1])]
+            bbox_tmp = BBox(min_bbox_tmp, max_bbox_tmp)
 
         # Add random gaussian noise
         frame = add_noise_to_image(frame)
@@ -146,13 +151,13 @@ def augment_percept(jobname, rgb_frame, img_num, bbox, percepts, n_augments=10):
             dset = 'test'
         else:
             dset = 'validate'
-        filepath = kDataPath + dset + '{}_{}_{}.jpg'.format(jobname, img_num, i)
 
+        filepath = DATA_PATH + dset + '/{}_{}_{}.jpg'.format(jobname, img_num, i)
         percept = create_percept(filepath, dset, frame, bbox_tmp)
         percepts.append(percept)
-        plot_frame_with_box(frame, bbox_tmp, filepath)
+        #plot_frame_with_box(frame, bbox_tmp, filepath)
         frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-        #cv2.imwrite(filepath, frame)
+        cv2.imwrite(filepath, frame)
 
     return percepts
 
@@ -164,17 +169,27 @@ def create_percept(filepath, dset, frame, bbox):
     percept['format'] = 'image/jpg'
     percept['x_size'] = frame.shape[0]
     percept['y_size'] = frame.shape[1]
-    percept['tags'] = ["Warthog", "trash.bag", dset]
 
-    bbox = [[bbox.min[0], bbox.min[1]],
-            [bbox.max[0], bbox.min[1]],
-            [bbox.max[0], bbox.max[1]],
-            [bbox.min[0], bbox.max[1]]]
-    percept['annotations'] = [{'domain' : 'trash',
-                               'model' : 'trash.bag'
-                               'confidence': 1,
-                               'boundary' : bbox,
-                               'annotation_tags' : ['auto.segmented']}]
+    if bbox:
+        percept['tags'] = ["Warthog", "trash.bag", dset]
+
+        bbox = [[bbox.min[0], bbox.min[1]],
+                [bbox.max[0], bbox.min[1]],
+                [bbox.max[0], bbox.max[1]],
+                [bbox.min[0], bbox.max[1]]]
+        percept['annotations'] = [{'domain' : 'trash',
+                                   'model' : 'trash.bag'
+                                   'confidence': 1,
+                                   'boundary' : bbox,
+                                   'annotation_tags' : ['auto.segmented']}]
+    else:
+        percept['tags'] = ["Warthog", "no.trash.bag", dset]
+        percept['annotations'] = [{'domain' : 'trash',
+                                   'model' : 'none'
+                                   'confidence': 1,
+                                   'annotation_tags' : ['auto.segmented']}]
+    else:
+
     return percept
 
 # Get the bounding box from the point cloud
@@ -226,27 +241,36 @@ def crop_image_lr(rgb_frame, bbox, pixels):
     frame_shape = rgb_frame.shape
 
     # Adjust bounding box
-    min_bbox = (max(bbox.min[0] - pixels, 0), bbox.min[1])
-    max_bbox = (min(bbox.max[0] - pixels, frame_shape[1]), bbox.max[1])
+    if bbox:
+        min_bbox = (max(bbox.min[0] - pixels, 0), bbox.min[1])
+        max_bbox = (min(bbox.max[0] - pixels, frame_shape[1]), bbox.max[1])
 
-    return rgb_frame, BBox(min_bbox, max_bbox)
+        return rgb_frame, BBox(min_bbox, max_bbox)
+
+    return rgb_frame, bbox
 
 # Resize image to be 256x256 and adjust bounding box
 def resize_image(rgb_frame, bbox):
     rgb_frame = cv2.resize(rgb_frame, (256, 256))
-    min_bbox = [bbox.min[0] / 2, bbox.min[1] / 2]
-    max_bbox = [bbox.max[0] / 2, bbox.max[1] / 2]
+    if bbox:
+        min_bbox = [bbox.min[0] / 2, bbox.min[1] / 2]
+        max_bbox = [bbox.max[0] / 2, bbox.max[1] / 2]
 
-    return rgb_frame, BBox(min_bbox, max_bbox)
+        return rgb_frame, BBox(min_bbox, max_bbox)
+
+    return rgb_frame, bbox
 
 # Flip (left/right) a image and its bounding box
 def flip_image(rgb_frame, bbox):
     rgb_frame = cv2.flip(rgb_frame, 1)
     img_size = rgb_frame.shape[0]
-    min_to_side = [img_size - bbox.min[0], bbox.min[1]]
-    max_to_side = [img_size - bbox.max[0], bbox.max[1]]
+    if bbox:
+        min_to_side = [img_size - bbox.min[0], bbox.min[1]]
+        max_to_side = [img_size - bbox.max[0], bbox.max[1]]
 
-    return rgb_frame, BBox(min_to_side, max_to_side)
+        return rgb_frame, BBox(min_to_side, max_to_side)
+
+    return rgb_frame, bbox
 
 # Add random gausian noise to image
 def add_noise_to_image(rgb_frame):
@@ -277,17 +301,19 @@ if __name__ == '__main__':
     parser.add_argument("h5", type=str, help="The h5 file containing the point cloud")
     parser.add_argument("jobname", type=str, help="The jobname to run the segmentation on")
     parser.add_argument("datapath", type=str, help="The path to the data to be utilized")
-    parser.add_argument("-n", dest='n', type=int, default=-1, help="The desired rgb frame number, or -1 (default) for all")
-    parser.add_argument("-seg", dest='segment', action='store_true')
-    parser.add_argument("-no-seg", dest='segment', action='store_false')
-    parser.set_defaults(segment=True)
+    parser.add_argument("--n_augs", dest='num_augments', type=int, default=10, help="The desired number of times to augment each frame")
+    parser.add_argument("--n_frame", dest='n', type=int, default=-1, help="The desired rgb frame number, or -1 (default) for all")
+    parser.add_argument("--seg", dest="seg", action='store_true', help="Set this flag if there are objects to segment")
+    parser.add_argument("--no_seg", dest="seg", action='store_false', help="Set this flag if there are no objects to segment")
+    parser.set_defaults(seg=True)
     args = parser.parse_args()
 
-    #kDataPath = '/home/ur5/external/warthog/data/'
-    kDataPath = args.datapath
+    # Set global variables
+    DATA_PATH = args.datapath
+    NUM_AUGMENTS = args.num_augments
 
     # Get desired frame from number
-    h5_file = h5py.File(kDataPath + 'hdf5/' + args.h5 + '.h5', 'r')
+    h5_file = h5py.File(DATA_PATH + 'hdf5/' + args.h5 + '.h5', 'r')
     depth_frames = h5_file[args.jobname + '_depth']
     bgr_frames = h5_file[args.jobname + '_rgb']
 
@@ -297,4 +323,4 @@ if __name__ == '__main__':
     else:
         frames_range = range(args.n, args.n+1)
 
-    main(args.jobname, depth_frames, bgr_frames, frames_range, args.segment)
+    main(args.seg, args.jobname, depth_frames, bgr_frames, frames_range)
