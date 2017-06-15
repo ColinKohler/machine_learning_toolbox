@@ -1,15 +1,19 @@
+import sys
 import tensorflow as tf
 import numpy as np
 
+WEIGHTS_PATH = '/home/colin/workspace/machine_learning_toolbox/alexnet_tf/bvlc_alexnet.npy'
+
 class AlexNet(object):
-    def __init__(self, x, keep_prob, skip_layer, output_nums, weights_path='bvlc_alexnet.npy'):
+    def __init__(self, x, keep_prob, output_num, skip_layer):
         self.x = x
         self.keep_prob = keep_prob
         self.skip_layer = skip_layer
-        self.weights_path = weights_path
-        self.output_nums = output_nums
+        self.output_num = output_num
 
-    def create(self):
+        self.createModel()
+
+    def createModel(self):
         conv1 = self.conv(self.x, 11, 11, 96, 4, 4, padding='VALID', name='conv1')
         pool1 = self.max_pool(conv1, 3, 3, 2, 2, padding='VALID', name='pool1')
         norm1 = self.lrn(pool1, 2, 2e-05, 0.75, name='norm1')
@@ -25,27 +29,17 @@ class AlexNet(object):
         pool5 = self.max_pool(conv5, 3, 3, 2, 2, padding='VALID', name='pool5')
 
         flattened = tf.reshape(pool5, [-1, 6*6*256])
+        fc6 = self.fc(flattened, 6*6*256, 4096, name='fc6')
+        dropout6 = self.dropout(fc6, self.keep_prob)
 
-        # Head 1
-        fc6_1 = self.fc(flattened, 6*6*256, 4096, name='fc6_1')
-        dropout6_1 = self.dropout(fc6_1, self.keep_prob)
+        fc7 = self.fc(dropout6, 4096, 4096, name='fc7')
+        dropout7 = self.dropout(fc7, self.keep_prob)
 
-        fc7_1 = self.fc(dropout6_1, 4096, 4096, name='fc7_1')
-        dropout7_1 = self.dropout(fc7_1, self.keep_prob)
+        self.fc8 = self.fc(dropout7, 4096, self.output_num, relu=False, name='fc8')
 
-        self.fc8_1 = self.fc(dropout7_1, 4096, self.output_nums[0], relu=False, name='fc8_1')
-
-        # Head 2
-        fc6_2 = self.fc(flattened, 6*6*256, 4096, name='fc6_2')
-        dropout6_2 = self.dropout(fc6_2, self.keep_prob)
-
-        fc7_2 = self.fc(dropout6_2, 4096, 4096, name='fc7_2')
-        dropout7_2 = self.dropout(fc7_2, self.keep_prob)
-
-        self.fc8_2 = self.fc(dropout7_2, 4096, self.output_nums[1], relu=False, name='fc8_2')
-
+    # Load weights from bvlc_alexnet.npy (Caffe weights)
     def loadInitialWeights(self, session):
-        weights_dict = np.load(self.weights_path, encoding='bytes').item()
+        weights_dict = np.load(WEIGHTS_PATH, encoding='bytes').item()
         for op_name in weights_dict:
             if op_name not in self.skip_layer:
                 with tf.variable_scope(op_name, reuse=True):
@@ -82,8 +76,8 @@ class AlexNet(object):
             return relu
 
     # Create Fully-connected Layer
-    def fc(self, x, num_in, num_out, relu=True):
-        with tf.variable_scope(name)as scope:
+    def fc(self, x, num_in, num_out, name ,relu=True):
+        with tf.variable_scope(name) as scope:
             weights = tf.get_variable('weights', shape=[num_in, num_out], trainable=True)
             biases = tf.get_variable('biases', shape=[num_out], trainable=True)
 
@@ -97,9 +91,9 @@ class AlexNet(object):
                               strides=[1, stride_y, stride_x, 1], padding=padding, name=name)
 
     # Create local response normalization layer
-    def lrn(x, radius, alpha, beta, name, bias=1.0):
+    def lrn(self, x, radius, alpha, beta, name, bias=1.0):
         return tf.nn.local_response_normalization(x, depth_radius=radius, alpha=alpha, beta=beta, bias=bias, name=name)
 
     # Create dropout layer
-    def dropout(x, keep_prob):
+    def dropout(self, x, keep_prob):
         return tf.nn.dropout(x, keep_prob)

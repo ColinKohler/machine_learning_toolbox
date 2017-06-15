@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/bash
 
 import sys, os
 sys.path.append('/home/colin/workspace/machine_learning_toolbox/')
@@ -15,13 +15,13 @@ train_file = dir_path + 'metadata/trash_bag_train.json'
 val_file = dir_path + 'metadata/trash_bag_validate.json'
 
 # Learing params
-lr = 0.0001
-num_epochs = 2
+lr = 0.000001
+num_epochs = 5
 batch_size = 128
 
 # Network params
 dropout_prob = 0.5
-num_output = 2
+num_output = 4
 train_layers = ['fc6', 'fc7', 'fc8']
 iou_threshold = 0.5
 
@@ -44,7 +44,7 @@ def main():
 
     # Setup loss function
     with tf.name_scope("loss"):
-        loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=output, labels=y))
+        loss = tf.reduce_mean(tf.norm(output - y))
 
     # Train Op
     with tf.name_scope('train'):
@@ -56,7 +56,21 @@ def main():
 
     # Evaluation op
     with tf.name_scope('accuracy'):
-        correct_pred = tf.equal(tf.argmax(output, 1), tf.argmax(y, 1))
+        x1 = tf.maximum(output[0], y[0])
+        y1 = tf.maximum(output[1], y[1])
+        x2 = tf.minimum(output[2], y[2])
+        y2 = tf.minimum(output[3], y[3])
+
+        inter_area = tf.multiply(tf.add(tf.subtract(x2, x1), 1.0),
+                                 tf.add(tf.subtract(y2, y1), 1.0))
+        box1_area = tf.multiply(tf.add(tf.subtract(output[2], output[0]), 1.0),
+                                tf.add(tf.subtract(output[3], output[1]), 1.0))
+        box2_area = tf.multiply(tf.add(tf.subtract(y[2], y[0]), 1.0),
+                                tf.add(tf.subtract(y[3], y[1]), 1.0))
+        outer_area = tf.subtract(tf.add(box1_area, box2_area), inter_area)
+        iou = tf.div(inter_area, outer_area)
+
+        correct_pred = tf.greater_equal(iou, iou_threshold)
         accuracy = tf.reduce_mean(tf.cast(correct_pred, tf.float32))
 
     # Tensorboard stuff
@@ -74,9 +88,8 @@ def main():
     writer = tf.summary.FileWriter(filewriter_path)
     saver = tf.train.Saver()
 
-    one_hot_encoding = {'no.trash.bag' : 0, 'trash.bag' : 1}
-    train_importer = RigorPerceptImporter(train_file, 2, batch_size, [0.0, 0.0, 0.0], one_hot_encoding)
-    val_importer = RigorPerceptImporter(val_file, 2, batch_size, [0.0, 0.0, 0.0], one_hot_encoding)
+    train_importer = RigorPerceptImporter(train_file, num_output, batch_size, [0.0, 0.0, 0.0])
+    val_importer = RigorPerceptImporter(val_file, num_output, batch_size, [0.0, 0.0, 0.0])
     train_batches_per_epoch = np.floor(train_importer.num_percepts / batch_size).astype(np.int16)
     val_batches_per_epoch = np.floor(val_importer.num_percepts / batch_size).astype(np.int16)
 

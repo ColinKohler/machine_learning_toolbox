@@ -39,7 +39,7 @@ class RigorPerceptImporter(object):
             annotation = self.getAnnotationWithDomain(annotations, domain)
             if self.one_hot_encoding:
                 labels[i][self.one_hot_encoding[annotation['model']]] = 1.0
-            else:
+            elif annotation['model'] == 'trash.bag':
                 labels[i] = self.getBBoxFromAnnotation(annotation)
 
         return images, labels
@@ -54,7 +54,7 @@ class RigorPerceptImporter(object):
 
     # Get the bounding box as [x1, y1, x2, y2]
     def getBBoxFromAnnotation(self, annotation):
-        bbox = annotations['boundary']
+        bbox = annotation['boundary']
         return [bbox[0][0], bbox[0][1], bbox[2][0], bbox[2][1]]
 
     # Shuffles data if desired
