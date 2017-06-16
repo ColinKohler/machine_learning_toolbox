@@ -2,13 +2,11 @@ import sys
 import tensorflow as tf
 import numpy as np
 
-WEIGHTS_PATH = '/home/colin/workspace/machine_learning_toolbox/alexnet_tf/bvlc_alexnet.npy'
+WEIGHTS_PATH = '/home/colin/workspace/machine_learning_toolbox/alexnet_tf/trash_weights.npy'
 
-class AlexNet(object):
-    def __init__(self, x, keep_prob, output_num, skip_layer):
+class FullConvAlexnet(object):
+    def __init__(self, x, output_num):
         self.x = x
-        self.keep_prob = keep_prob
-        self.skip_layer = skip_layer
         self.output_num = output_num
 
         self.createModel()
@@ -28,28 +26,33 @@ class AlexNet(object):
         conv5 = self.conv(conv4, 3, 3, 256, 1, 1, groups=2, name='conv5')
         pool5 = self.max_pool(conv5, 3, 3, 2, 2, padding='VALID', name='pool5')
 
-        flattened = tf.reshape(pool5, [-1, 6*6*256])
-        fc6 = self.fc(flattened, 6*6*256, 4096, name='fc6')
-        dropout6 = self.dropout(fc6, self.keep_prob)
+        conv6 = self.conv(pool5, 6, 6, 4096, 1, 1, name='fc6-conv', padding='VALID')
+        conv7 = self.conv(conv6, 1, 1, 4096, 1, 1, name='fc7-conv')
 
-        fc7 = self.fc(dropout6, 4096, 4096, name='fc7')
-        dropout7 = self.dropout(fc7, self.keep_prob)
-
-        self.fc8 = self.fc(dropout7, 4096, self.output_num, relu=False, name='fc8')
+        self.conv8 = self.conv(conv7, 1, 1, self.output_num, 1, 1, name='fc8-conv')
 
     # Load weights from bvlc_alexnet.npy (Caffe weights)
     def loadInitialWeights(self, session):
-        weights_dict = np.load(WEIGHTS_PATH, encoding='bytes').item()
+        weights_dict = np.load(WEIGHTS_PATH).item()
         for op_name in weights_dict:
-            if op_name not in self.skip_layer:
-                with tf.variable_scope(op_name, reuse=True):
-                    for data in weights_dict[op_name]:
-                        if len(data.shape) == 1:
-                            var = tf.get_variable('biases', trainable=False)
-                            session.run(var.assign(data))
-                        else:
-                            var = tf.get_variable('weights', trainable=False)
-                            session.run(var.assign(data))
+            tmp_name1 = op_name.split('_', 1)[0]
+            tmp_name2 = tmp_name1.split('-', 1)[0]
+            if 'fc' in tmp_name1:
+                tmp_name1 = tmp_name1 + '-conv'
+            with tf.variable_scope(tmp_name1, reuse=True):
+                data = weights_dict[op_name]
+                if len(data.shape) == 1:
+                    var = tf.get_variable('biases', trainable=False)
+                    session.run(var.assign(data))
+                else:
+                    var = tf.get_variable('weights', trainable=False)
+                    if tmp_name2 == 'fc6':
+                        print data.shape
+                        session.run(var.assign(data.reshape([6,6,256,4096])))
+                    elif tmp_name2 in ['fc7', 'fc8']:
+                        session.run(var.assign(data.reshape([1,1]+list(data.shape))))
+                    else:
+                        session.run(var.assign(data))
 
     # Create Convolutional layer, to split computation use groups > 1
     def conv(self, x, filter_height, filter_width, num_filters, stride_y, stride_x, name, padding='SAME', groups=1):

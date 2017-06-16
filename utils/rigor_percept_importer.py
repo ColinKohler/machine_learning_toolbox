@@ -4,15 +4,23 @@ import random
 import numpy as np
 
 class RigorPerceptImporter(object):
-    def __init__(self, metadata_path, num_output, batch_size, mean, one_hot_encoding=None):
-        self.num_output = num_output
+    def __init__(self, metadata_path, batch_size, mean, class_encoding_path):
         self.batch_size = batch_size
-        self.one_hot_encoding = one_hot_encoding
         self.mean = mean
         self.pointer = 0
 
+        self.loadClassEncoding(class_encoding_path)
         self.readMetadata(metadata_path)
         self.shuffleData()
+
+     Load the class encoding
+    def loadClassEncoding(self, path):
+        self.one_hot_encoding = dict()
+        with open(path, 'r') as f:
+            for line in f:
+                cls, num = line.split(' ', 1)
+                self.one_hot_encoding[cls] = int(num)
+        self.num_classes = len(self.one_hot_encoding)
 
     # Read percept data from metadata json file
     def readMetadata(self, path):
@@ -23,7 +31,7 @@ class RigorPerceptImporter(object):
     # Get the next batch
     def getBatch(self, domain=None):
         batch_percepts = self.percepts[self.pointer:self.pointer + self.batch_size]
-        labels = np.zeros([self.batch_size, self.num_output])
+        labels = np.zeros([self.batch_size, self.num_classes])
         images = np.ndarray([self.batch_size, 227, 227, 3])
         for i, percept in enumerate(batch_percepts):
             # Load image

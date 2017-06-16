@@ -4,12 +4,16 @@ import numpy as np
 
 WEIGHTS_PATH = '/home/colin/workspace/machine_learning_toolbox/alexnet_tf/bvlc_alexnet.npy'
 
-class AlexNet(object):
-    def __init__(self, x, keep_prob, output_num, skip_layer):
+class Alexnet(object):
+    def __init__(self, x, keep_prob, output_num, lr=None, y=None, skip_layer=list(), train=True):
         self.x = x
+        self.y = y
+        self.lr = lr
         self.keep_prob = keep_prob
         self.skip_layer = skip_layer
         self.output_num = output_num
+        self.weights = dict()
+        self.train = train
 
         self.createModel()
 
@@ -36,6 +40,26 @@ class AlexNet(object):
         dropout7 = self.dropout(fc7, self.keep_prob)
 
         self.fc8 = self.fc(dropout7, 4096, self.output_num, relu=False, name='fc8')
+
+        if self.train:
+            # Setup loss
+            with tf.name_scope("loss"):
+                self.loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=self.fc8, labels=self.y))
+
+            # Train Op
+            with tf.name_scope('train'):
+                optimizer = tf.train.AdamOptimizer(self.lr)
+                self.train_op = optimizer.minimize(self.loss)
+
+            # Evaluation op
+            with tf.name_scope('accuracy'):
+                correct_pred = tf.equal(tf.argmax(self.fc8, 1), tf.argmax(self.y, 1))
+                self.accuracy = tf.reduce_mean(tf.cast(correct_pred, tf.float32))
+
+            # Tensorboard stuff
+            tf.summary.scalar('l2_loss', self.loss)
+            tf.summary.scalar('accuracy', self.accuracy)
+            self.merged_summary = tf.summary.merge_all()
 
     # Load weights from bvlc_alexnet.npy (Caffe weights)
     def loadInitialWeights(self, session):
@@ -73,6 +97,9 @@ class AlexNet(object):
             bias = tf.reshape(tf.nn.bias_add(conv, biases), conv.get_shape().as_list())
             relu = tf.nn.relu(bias, name=scope.name)
 
+            self.weights[name+'_w'] = weights
+            self.weights[name+'_b'] = biases
+
             return relu
 
     # Create Fully-connected Layer
@@ -83,6 +110,10 @@ class AlexNet(object):
 
             act = tf.nn.xw_plus_b(x, weights, biases, name=scope.name)
             relu = tf.nn.relu(act) if relu else act
+
+            self.weights[name+'_w'] = weights
+            self.weights[name+'_b'] = biases
+
             return relu
 
     # Create max pooling layer
