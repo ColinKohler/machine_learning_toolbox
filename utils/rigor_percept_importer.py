@@ -13,7 +13,7 @@ class RigorPerceptImporter(object):
         self.readMetadata(metadata_path)
         self.shuffleData()
 
-     Load the class encoding
+    # Load the class encoding
     def loadClassEncoding(self, path):
         self.one_hot_encoding = dict()
         with open(path, 'r') as f:
