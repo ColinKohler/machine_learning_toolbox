@@ -24,7 +24,7 @@ class ImageAugmenter(object):
 
         if bbox is not None:
             min_bbox = [max(bbox[0][0] - pixels, 0), bbox[0][1]]
-            max_bbox = [max(bbox[1][0] - pixels, width), bbox[1][1]]
+            max_bbox = [min(bbox[1][0] - pixels, width), bbox[1][1]]
 
             return img, [min_bbox, max_bbox]
         else:
@@ -37,7 +37,7 @@ class ImageAugmenter(object):
 
         if bbox is not None:
             min_bbox = [bbox[0][0], max(bbox[0][1] - pixels, 0)]
-            max_bbox = [bbox[1][0], max(bbox[1][1] - pixels, height)]
+            max_bbox = [bbox[1][0], min(bbox[1][1] - pixels, height)]
 
             return img, [min_bbox, max_bbox]
         else:
@@ -47,16 +47,18 @@ class ImageAugmenter(object):
     def resizeImage(self, img, new_dim, bbox=None):
         rgb_frame = cv2.resize(rgb_frame, (256, 256))
         if bbox is not None:
-            min_bbox = [bbox.[0][0] / 2, bbox.min[0][1] / 2]
-            max_bbox = [bbox.[1][0] / 2, bbox.max[1][1] / 2]
+            min_bbox = [bbox.min[0][0] / 2, bbox.min[0][1] / 2]
+            max_bbox = [bbox.max[1][0] / 2, bbox.max[1][1] / 2]
 
             return rgb_frame, [min_bbox, max_bbox]
         else:
             return rgb_frame
 
     # Flip a image
-    def flipImageLR(self, img, bbox=None):
-        img = cv2.flip(img, 1)
+    def flipImageLR(self, img, prob, bbox=None):
+        if np.random.uniform(1.0) < prob:
+            img = cv2.flip(img, 1)
+
         if bbox is not None:
             height, width, channels = img.shape
             min_to_side = [width - bbox[0][0] / 2, bbox[0][1]]
@@ -94,18 +96,42 @@ class ImageAugmenter(object):
             return img
 
     # Add random noise to the image
-    def addNoiseToImage(self, img, mode='gaussian', bbox=None):
+    def addNoiseToImage(self, img, scale, mode='gaussian', bbox=None):
         noise = np.zeros(img.shape, np.uint8)
         if mode == 'gaussian':
-            cv2.randn(noise, np.zeros(3), np.ones(3)*255.0.1)
+            cv2.randn(noise, np.zeros(3), np.ones(3)*255*scale)
 
         img = cv2.add(img, noise, dtype=cv2.CV_8UC3)
-        return img
+
+        if bbox is not None:
+            return img, bbox
+        else:
+            return img
 
     # Take a random crop from the imag
-    def cropImageRandom(self, img, zoom, bbox=None):
-        pass
+    def cropImageRandom(self, img, crop_range, bbox=None):
+        top_crop    = self._randIntInRange(crop_range[0])
+        bottom_crop = self._randIntInRange(crop_range[1])
+        left_crop   = self._randIntInRange(crop_range[2])
+        right_crop  = self._randIntInRange(crop_range[3])
+
+        height, width, channels = img.shape
+        bottom_crop = height if bottom_crop == 0 else -bottom_crop
+        right_crop = width if right_crop == 0 else -right_crop
+
+        img = img[top_crop:bottom_crop,left_crop:right_crop,:]
+        if bbox is not None:
+            min_bbox = [max(bbox[0][0] - left_crop, 0), max(bbox[0][1] - top_crop, 0)]
+            max_bbox = [min(bbox[1][0] - right_crop, width), min(bbox[1][1] - bottom_crop, height)]
+
+            return img, bbox
+        else:
+            return img
 
     # Create 2D homogenous point
     def _createHPoint(self, p):
         return [p[0], p[1], 1.0]
+
+    # Generate random int in the given range
+    def _randIntInRange(self, r):
+        return np.random.randint(r[0], r[1])

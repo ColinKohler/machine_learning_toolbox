@@ -1,6 +1,6 @@
 import pcl
 import numpy as np
-from sklean.cluster import MeanShift, estimate_bandwidth
+from sklearn.cluster import MeanShift, estimate_bandwidth
 from image_geometry import PinholeCameraModel
 from sensor_msgs.msg import CameraInfo
 
@@ -13,10 +13,14 @@ class ObjectSegmenter(object):
         self.cam_model = PinholeCameraModel()
         self.cam_model.fromCameraInfo(cam_info)
 
-    def segmentObjectInFrames(self, depth_frames, rgb_frames, dis_to_object):
-        bboxes = list()
-        for i, (depth_frame, rgb_frame) in enumerate(zip(depth_frames, rgb_frames)):
-            pt_cloud = pcl.PointCloud(cloud.astype(np.float32))
+    # Segment out the object from the depth frame
+    def segmentObjectInFrame(self, depth_frame, dis_to_object):
+        pt_cloud = pcl.PointCloud(cloud.astype(np.float32))
+        pt_cloud = self._removePointsOutsideWorkspace(pt_cloud, dis_to_object)
+        pt_cloud = self._removeFloorPlane(pt_cloud)
+        pt_cloud = self._removeOutliers(pt_cloud)
+        pt_cloud = self._clusterPoints(pt_cloud)
+        return self._getCloudLimits(pt_cloud)
 
     # Remove all points behind the object to isolate the workspace
     def _removePointsOutsideWorkspace(self, pt_cloud, dis_to_object):
@@ -59,3 +63,22 @@ class ObjectSegmenter(object):
 
         pt_cloud = pcl.PointCloud(cluster.astype(np.float32))
         return pt_cloud
+
+    # Get the bounding box from the point cloud
+    def _getCloudLimits(cloud):
+        n_cloud = np.asarray(cloud)
+
+        min_x = np.min(n_cloud[:,0])
+        min_y = np.min(n_cloud[:,1])
+        min_z = np.min(n_cloud[:,2])
+        min_bbox = [min_x, min_y, min_z]
+
+        max_x = np.max(n_cloud[:,0])
+        max_y = np.max(n_cloud[:,1])
+        max_z = np.max(n_cloud[:,2])
+        max_bbox = [max_x, max_y, max_z]
+
+        min_bbox = self.cam_model.project3dToPixel(min_bbox)
+        max_bbox = self.cam_model.project3dToPixel(max_bbox)
+
+        return [min_bbox, max_bbox]
