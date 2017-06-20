@@ -3,6 +3,8 @@
 import argparse
 import numpy as np
 import json
+import h5py
+import cv2
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 
@@ -28,7 +30,8 @@ def main(jobname, depth_frames, rgb_frames, frames_range, datapath, n_augs, seg)
             cloud = depth_frame.reshape((num_points, 3))
 
             # Segment bag and convert 3d points to 2d
-            bag_bbox = segmenter.segmentObjectInFrame(cloud, 2.35)
+            bbox = segmenter.segmentObjectInFrame(cloud, 2.35)
+            bbox = pad_bbox(bbox)
             valid, bbox_areas = validate_bbox(bbox, bbox_areas)
             if not valid:
                 print "Rejecting frame due to bad bounding box..."
@@ -38,14 +41,15 @@ def main(jobname, depth_frames, rgb_frames, frames_range, datapath, n_augs, seg)
 
         # Augment data
         print "Augmenting Frame {}...".format(frame_num)
-        crop_range = [(0,200), (0,30), (0,100), (0,100)]
-        routine = [{'method' : aug.cropImageRandom, 'args' : [crop_range]},
-                   {'method' : aug.flipImageLR,     'args' : [0.5]},
-                   {'method' : aug.transformImage,  'args' : [0, 10, -15, 15]},
-                   {'method' : aug.addNoiseToImage, 'args' : [0.1]}]
+        crop_range = [(50,200), (0,30), (0,50), (0,50)]
+        routine = [{'method' : augmenter.cropImageRandom, 'args' : [crop_range]},
+                   {'method' : augmenter.resizeImage,     'args' : [(480,480)]},
+                   {'method' : augmenter.flipImageLR,     'args' : [0.5]},
+                   {'method' : augmenter.transformImage,  'args' : [-5, 5, -15, 15]},
+                   {'method' : augmenter.addNoiseToImage, 'args' : [0.1, 0.2]}]
 
         for i in range(n_augs):
-            img = aug.augmentImageWithConfig(rgb_frame, routine)
+            img, bbox = augmenter.augmentImageWithConfig(rgb_frame, routine, bbox)
             if (i % 5) < 3:
                 dset = 'train'
             elif (i % 5) == 3:
@@ -53,10 +57,10 @@ def main(jobname, depth_frames, rgb_frames, frames_range, datapath, n_augs, seg)
             else:
                 dset = 'validate'
 
-            filepath = DATA_PATH + dset + '/{}_{}_{}.jpg'.format(jobname, frame_num, i)
-            percept = create_percept(filepath, dset, frame, bbox_tmp)
+            filepath = datapath + dset + '/{}_{}_{}.jpg'.format(jobname, frame_num, i)
+            percept = create_percept(filepath, dset, img, bbox)
             percepts.append(percept)
-            plot_frame_with_box(frame, bbox_tmp, filepath)
+            plotImgWithBox(img, bbox, filepath)
             #img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
             #cv2.imwrite(filepath, img)
 
@@ -66,21 +70,21 @@ def main(jobname, depth_frames, rgb_frames, frames_range, datapath, n_augs, seg)
         json.dump(percepts, p_file)
 
 # Create the percept annotations for the given image
-def create_percept(filepath, dset, frame, bbox):
+def create_percept(filepath, dset, img, bbox):
     percept = dict()
     percept['source'] = 'file://' + filepath
     percept['locator'] = 'file://' + filepath
     percept['format'] = 'image/jpg'
-    percept['x_size'] = frame.shape[0]
-    percept['y_size'] = frame.shape[1]
+    percept['x_size'] = img.shape[0]
+    percept['y_size'] = img.shape[1]
 
     if bbox:
         percept['tags'] = ["Warthog", "trash.bag", dset]
 
-        bbox = [[bbox.min[0], bbox.min[1]],
-                [bbox.max[0], bbox.min[1]],
-                [bbox.max[0], bbox.max[1]],
-                [bbox.min[0], bbox.max[1]]]
+        bbox = [[bbox[0][0], bbox[0][1]],
+                [bbox[1][0], bbox[0][1]],
+                [bbox[1][0], bbox[1][1]],
+                [bbox[0][0], bbox[1][1]]]
         percept['annotations'] = [{'domain' : 'trash',
                                    'model' : 'trash.bag',
                                    'confidence': 1,
@@ -96,7 +100,7 @@ def create_percept(filepath, dset, frame, bbox):
 
 # Pad bounding box
 def pad_bbox(bbox, pad=25):
-    min_bbox = [bbox[0][0], bbox[0][1] - pad]
+    min_bbox = [bbox[0][0] - pad, bbox[0][1] - pad]
     max_bbox = [bbox[1][0] + pad, bbox[1][1] + pad]
     return [min_bbox, max_bbox]
 
@@ -116,12 +120,12 @@ def validate_bbox(bbox, bbox_areas):
     return valid, bbox_areas
 
 # Save frame with bounding box displayed
-def plot_frame_with_box(rgb_frame, bbox, filepath):
+def plotImgWithBox(img, bbox, filepath):
     fig, ax = plt.subplots(1)
-    ax.imshow(rgb_frame)
+    ax.imshow(img)
     diff_x = bbox[1][0] - bbox[0][0]
     diff_y = bbox[1][1] - bbox[0][1]
-    rect = patches.Rectangle(bbox.min, diff_x, diff_y, linewidth=1, edgecolor='r', facecolor='none')
+    rect = patches.Rectangle(bbox[0], diff_x, diff_y, linewidth=1, edgecolor='r', facecolor='none')
     ax.add_patch(rect)
     fig.savefig(filepath)
     plt.close(fig)
@@ -140,9 +144,9 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     # Get desired frame from number
-    h5_file = h5py.File(DATA_PATH + 'hdf5/' + args.h5 + '.h5', 'r')
+    h5_file = h5py.File(args.datapath + 'hdf5/' + args.h5 + '.h5', 'r')
     depth_frames = h5_file[args.jobname + '_depth']
-    bgr_frames = h5_file[args.jobname + '_rgb']
+    rgb_frames = h5_file[args.jobname + '_rgb']
 
     # Determine range from cmd line argument
     if args.n == -1:
@@ -150,4 +154,4 @@ if __name__ == '__main__':
     else:
         frames_range = range(args.n, args.n+1)
 
-    main(jobname, depth_frames, rgb_frames, frames_range, datapath, n_augs, seg)
+    main(args.jobname, depth_frames, rgb_frames, frames_range, args.datapath, args.num_augments, args.seg)

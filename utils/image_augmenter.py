@@ -45,28 +45,38 @@ class ImageAugmenter(object):
 
     # Resize the image to the given shape
     def resizeImage(self, img, new_dim, bbox=None):
-        rgb_frame = cv2.resize(rgb_frame, (256, 256))
-        if bbox is not None:
-            min_bbox = [bbox.min[0][0] / 2, bbox.min[0][1] / 2]
-            max_bbox = [bbox.max[1][0] / 2, bbox.max[1][1] / 2]
+        old_height, old_width, channels = img.shape
+        img = cv2.resize(img, new_dim)
+        height, width, channels = img.shape
 
-            return rgb_frame, [min_bbox, max_bbox]
+        if bbox is not None:
+            x_scale = width / float(old_width)
+            y_scale = height / float(old_height)
+            min_bbox = [bbox[0][0] * x_scale, bbox[0][1] * y_scale]
+            max_bbox = [bbox[1][0] * x_scale, bbox[1][1] * y_scale]
+
+            return img, [min_bbox, max_bbox]
         else:
-            return rgb_frame
+            return img
 
     # Flip a image
     def flipImageLR(self, img, prob, bbox=None):
-        if np.random.uniform(1.0) < prob:
+        if np.random.uniform(0.0, 1.0) >= prob:
             img = cv2.flip(img, 1)
 
-        if bbox is not None:
-            height, width, channels = img.shape
-            min_to_side = [width - bbox[0][0] / 2, bbox[0][1]]
-            max_to_side = [width - bbox[1][0] / 2, bbox[1][1]]
+            if bbox is not None:
+                height, width, channels = img.shape
+                min_to_side = [width - bbox[0][0], bbox[0][1]]
+                max_to_side = [width - bbox[1][0], bbox[1][1]]
 
-            return img, [min_to_side, max_to_side]
+                return img, [min_to_side, max_to_side]
+            else:
+                return img
         else:
-            return img
+            if bbox is not None:
+                return img, bbox
+            else:
+                return img
 
 
     # Transform the image a random amount
@@ -85,8 +95,8 @@ class ImageAugmenter(object):
         # Apply transformation
         img = cv2.warpAffine(img, H, (height, width))
         if bbox is not None:
-            min_bbox = H.dot(self.createHPoint(bbox[0]))
-            max_bbox = H.dot(self.createHPoint(bbox[1]))
+            min_bbox = H.dot(self._createHPoint(bbox[0]))
+            max_bbox = H.dot(self._createHPoint(bbox[1]))
             min_bbox = [round(x) for x in min_bbox]
             max_bbox = [round(x) for x in max_bbox]
             bbox = [min_bbox, max_bbox]
@@ -96,7 +106,8 @@ class ImageAugmenter(object):
             return img
 
     # Add random noise to the image
-    def addNoiseToImage(self, img, scale, mode='gaussian', bbox=None):
+    def addNoiseToImage(self, img, min_scale, max_scale, mode='gaussian', bbox=None):
+        scale = np.random.uniform(min_scale, max_scale)
         noise = np.zeros(img.shape, np.uint8)
         if mode == 'gaussian':
             cv2.randn(noise, np.zeros(3), np.ones(3)*255*scale)
@@ -116,15 +127,16 @@ class ImageAugmenter(object):
         right_crop  = self._randIntInRange(crop_range[3])
 
         height, width, channels = img.shape
-        bottom_crop = height if bottom_crop == 0 else -bottom_crop
-        right_crop = width if right_crop == 0 else -right_crop
+        bottom_crop_tmp = height if bottom_crop == 0 else -bottom_crop
+        right_crop_tmp = width if right_crop == 0 else -right_crop
 
-        img = img[top_crop:bottom_crop,left_crop:right_crop,:]
+        img = img[top_crop:bottom_crop_tmp,left_crop:right_crop_tmp,:]
+        height, width, channels = img.shape
         if bbox is not None:
             min_bbox = [max(bbox[0][0] - left_crop, 0), max(bbox[0][1] - top_crop, 0)]
-            max_bbox = [min(bbox[1][0] - right_crop, width), min(bbox[1][1] - bottom_crop, height)]
+            max_bbox = [min(bbox[1][0] - left_crop, width), min(bbox[1][1] - top_crop, height)]
 
-            return img, bbox
+            return img, [min_bbox, max_bbox]
         else:
             return img
 

@@ -8,14 +8,14 @@ class ObjectSegmenter(object):
     def __init__(self, camera_info_filepath):
         cam_info = CameraInfo()
         with open(camera_info_filepath, 'r') as fd:
-            cam_data = fc.read()
+            cam_data = fd.read()
         cam_info.deserialize(cam_data)
         self.cam_model = PinholeCameraModel()
         self.cam_model.fromCameraInfo(cam_info)
 
     # Segment out the object from the depth frame
-    def segmentObjectInFrame(self, depth_frame, dis_to_object):
-        pt_cloud = pcl.PointCloud(cloud.astype(np.float32))
+    def segmentObjectInFrame(self, pt_cloud, dis_to_object):
+        pt_cloud = pcl.PointCloud(pt_cloud.astype(np.float32))
         pt_cloud = self._removePointsOutsideWorkspace(pt_cloud, dis_to_object)
         pt_cloud = self._removeFloorPlane(pt_cloud)
         pt_cloud = self._removeOutliers(pt_cloud)
@@ -65,7 +65,7 @@ class ObjectSegmenter(object):
         return pt_cloud
 
     # Get the bounding box from the point cloud
-    def _getCloudLimits(cloud):
+    def _getCloudLimits(self, cloud):
         n_cloud = np.asarray(cloud)
 
         min_x = np.min(n_cloud[:,0])
