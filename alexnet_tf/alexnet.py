@@ -41,6 +41,12 @@ class Alexnet(object):
 
         self.fc8 = self.fc(dropout7, 4096, self.output_num, relu=False, name='fc8')
 
+        if self.y is not None:
+            # Evaluation op
+            with tf.name_scope('accuracy'):
+                correct_pred = tf.equal(tf.argmax(self.fc8, 1), tf.argmax(self.y, 1))
+                self.accuracy = tf.reduce_mean(tf.cast(correct_pred, tf.float32))
+
         if self.train:
             # Setup loss
             with tf.name_scope("loss"):
@@ -55,14 +61,6 @@ class Alexnet(object):
             tf.summary.scalar('l2_loss', self.loss)
             tf.summary.scalar('accuracy', self.accuracy)
             self.merged_summary = tf.summary.merge_all()
-
-        if self.y is not None:
-            # Evaluation op
-            with tf.name_scope('accuracy'):
-                correct_pred = tf.equal(tf.argmax(self.fc8, 1), tf.argmax(self.y, 1))
-                self.accuracy = tf.reduce_mean(tf.cast(correct_pred, tf.float32))
-
-
 
     # Load weights from bvlc_alexnet.npy (Caffe weights)
     def loadInitialWeights(self, session):

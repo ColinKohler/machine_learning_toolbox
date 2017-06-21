@@ -3,10 +3,10 @@
 import os
 import numpy as np
 import tensorflow as tf
+import argparse
 from datetime import datetime
 from alexnet_tf.alexnet import Alexnet
 from utils.rigor_percept_importer import RigorPerceptImporter
-import argparse
 
 def train(args):
     # Get training and validation data
@@ -20,7 +20,7 @@ def train(args):
     x = tf.placeholder(tf.float32, [args.batch, 227, 227, 3])
     y = tf.placeholder(tf.float32, [None, num_output])
     keep_prob = tf.placeholder(tf.float32)
-    model = Alexnet(x, y=y, lr=args.lr, keep_prob, num_output, skip_layer=args.finetune_layers)
+    model = Alexnet(x, keep_prob, num_output, y=y, lr=args.lr, skip_layer=args.finetune_layers)
     output = model.fc8
 
     writer = tf.summary.FileWriter(args.tensorboard_path)

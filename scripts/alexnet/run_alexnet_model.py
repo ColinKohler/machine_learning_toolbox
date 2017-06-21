@@ -5,13 +5,14 @@ import argparse
 import cv2
 import numpy as np
 from alexnet_tf.alexnet import Alexnet
+import utils.tf_utils as tf_utils
 
 def test(args):
     img = cv2.imread(args.image_path)
     img = cv2.resize(img, (227, 227))
     img = img.astype(np.float32)
 
-    one_hot_encoding = loadClassEncoding(args.class_encoding_path)
+    one_hot_encoding = tf_utils.loadClassEncoding(args.class_encoding_path)
     num_classes = len(one_hot_encoding)
 
     # TensorFlow stuff
@@ -38,15 +39,6 @@ def test(args):
         for key in model.weights.keys():
             w[key] = sess.run(model.weights[key])
     np.save('trash_weights.npy', w)
-
-# Load the class encoding
-def loadClassEncoding(path):
-    one_hot_encoding = dict()
-    with open(path, 'r') as f:
-        for line in f:
-            cls, num = line.split(' ', 1)
-            one_hot_encoding[cls] = int(num)
-    return one_hot_encoding
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

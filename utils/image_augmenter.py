@@ -2,8 +2,12 @@ import numpy as np
 import cv2
 
 class ImageAugmenter(object):
-    def __init__(self):
-        pass
+    def __init__(self, config=None):
+        self.config = config
+
+    # Augment the image using the config specified at init
+    def augmentImage(self, img, bbox=None):
+        return self.augmentImageWithConfig(img, self.config, bbox)
 
     # Augment the image using the given config dict
     def augmentImageWithConfig(self, img, config, bbox=None):
@@ -14,6 +18,22 @@ class ImageAugmenter(object):
                 img = augment['method'](img, *augment['args'])
         if bbox is not None:
             return img, bbox
+        else:
+            return img
+
+    # Crop random window of given size from image
+    def cropImageRandomWindow(self, img, window_size, bbox=None):
+        height, width, channels = img.shape
+        start_x = self._randIntInRange((0,width-window_size))
+        start_y = self._randIntInRange((0,height-window_size))
+        img = img[start_y:start_y+window_size, start_x:start_x+window_size,:]
+
+        height, width, channels = img.shape
+        if bbox is not None:
+            min_bbox = [max(bbox[0][0] - start_x, 0), max(bbox[0][1] - start_y, 0)]
+            max_bbox = [min(bbox[1][0] - start_x, width), min(bbox[1][1] - start_y, height)]
+
+            return img, [min_bbox, max_bbox]
         else:
             return img
 
@@ -38,6 +58,27 @@ class ImageAugmenter(object):
         if bbox is not None:
             min_bbox = [bbox[0][0], max(bbox[0][1] - pixels, 0)]
             max_bbox = [bbox[1][0], min(bbox[1][1] - pixels, height)]
+
+            return img, [min_bbox, max_bbox]
+        else:
+            return img
+
+    # Take a random crop from the imag
+    def cropImageRandom(self, img, crop_range, bbox=None):
+        top_crop    = self._randIntInRange(crop_range[0])
+        bottom_crop = self._randIntInRange(crop_range[1])
+        left_crop   = self._randIntInRange(crop_range[2])
+        right_crop  = self._randIntInRange(crop_range[3])
+
+        height, width, channels = img.shape
+        bottom_crop_tmp = height if bottom_crop == 0 else -bottom_crop
+        right_crop_tmp = width if right_crop == 0 else -right_crop
+
+        img = img[top_crop:bottom_crop_tmp,left_crop:right_crop_tmp,:]
+        height, width, channels = img.shape
+        if bbox is not None:
+            min_bbox = [max(bbox[0][0] - left_crop, 0), max(bbox[0][1] - top_crop, 0)]
+            max_bbox = [min(bbox[1][0] - left_crop, width), min(bbox[1][1] - top_crop, height)]
 
             return img, [min_bbox, max_bbox]
         else:
@@ -77,7 +118,6 @@ class ImageAugmenter(object):
                 return img, bbox
             else:
                 return img
-
 
     # Transform the image a random amount
     def transformImage(self, img, min_trans, max_trans, min_rot, max_rot, bbox=None):
@@ -119,26 +159,29 @@ class ImageAugmenter(object):
         else:
             return img
 
-    # Take a random crop from the imag
-    def cropImageRandom(self, img, crop_range, bbox=None):
-        top_crop    = self._randIntInRange(crop_range[0])
-        bottom_crop = self._randIntInRange(crop_range[1])
-        left_crop   = self._randIntInRange(crop_range[2])
-        right_crop  = self._randIntInRange(crop_range[3])
+    # Add jitteer to the RGB channels
+    def addColorJitter(self, img, jitter_range, bbox=None):
+        r_jitter = self._randIntInRange(jitter_range)
+        g_jitter = self._randIntInRange(jitter_range)
+        b_jitter = self._randIntInRange(jitter_range)
 
-        height, width, channels = img.shape
-        bottom_crop_tmp = height if bottom_crop == 0 else -bottom_crop
-        right_crop_tmp = width if right_crop == 0 else -right_crop
+        R = img[:,:,0]
+        G = img[:,:,1]
+        B = img[:,:,2]
+        img = np.dstack((
+            np.roll(R, r_jitter, axis=0),
+            np.roll(G, g_jitter, axis=1),
+            np.roll(B, b_jitter, axis=0)
+            ))
 
-        img = img[top_crop:bottom_crop_tmp,left_crop:right_crop_tmp,:]
-        height, width, channels = img.shape
         if bbox is not None:
-            min_bbox = [max(bbox[0][0] - left_crop, 0), max(bbox[0][1] - top_crop, 0)]
-            max_bbox = [min(bbox[1][0] - left_crop, width), min(bbox[1][1] - top_crop, height)]
-
-            return img, [min_bbox, max_bbox]
+            return img, bbox
         else:
             return img
+
+    # Alter the intensities of the RGB channels in the image
+    def alterRGBIntensities(self, img, bbox=None):
+        pass
 
     # Create 2D homogenous point
     def _createHPoint(self, p):
