@@ -35,11 +35,11 @@ def run(args):
         print best[0].argmax(axis=2)
         print np.unravel_index(best[0,:,:,1].argmax(), [8,8])
 
-        plt.subplot(1,2,1)
-        plt.imshow(rgb_img)
-        plt.subplot(1,2,2)
-        plt.imshow(best[0,:,:,1])
-        plt.show()
+        #plt.subplot(1,2,1)
+        #plt.imshow(rgb_img)
+        #plt.subplot(1,2,2)
+        #plt.imshow(best[0,:,:,1])
+        #plt.show()
 
 # Load the class encoding
 def loadClassEncoding(path):

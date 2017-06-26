@@ -2,7 +2,6 @@ import sys
 import tensorflow as tf
 import numpy as np
 
-WEIGHTS_PATH = '/home/colin/workspace/machine_learning_toolbox/alexnet_tf/trash_weights.npy'
 
 class FullConvAlexnet(object):
     def __init__(self, x, output_num):
@@ -26,14 +25,14 @@ class FullConvAlexnet(object):
         conv5 = self.conv(conv4, 3, 3, 256, 1, 1, groups=2, name='conv5')
         pool5 = self.max_pool(conv5, 3, 3, 2, 2, padding='VALID', name='pool5')
 
-        conv6 = self.conv(pool5, 6, 6, 4096, 1, 1, name='fc6-conv', padding='VALID')
-        conv7 = self.conv(conv6, 1, 1, 4096, 1, 1, name='fc7-conv')
+        conv6 = self.conv(pool5, 6, 6, 4096, 1, 1, name='fc6-conv', padding='VALID', reuse=False)
+        conv7 = self.conv(conv6, 1, 1, 4096, 1, 1, name='fc7-conv', reuse=False)
 
-        self.conv8 = self.conv(conv7, 1, 1, self.output_num, 1, 1, name='fc8-conv')
+        self.conv8 = self.conv(conv7, 1, 1, self.output_num, 1, 1, name='fc8-conv', reuse=False)
 
     # Load weights from bvlc_alexnet.npy (Caffe weights)
-    def loadInitialWeights(self, session):
-        weights_dict = np.load(WEIGHTS_PATH).item()
+    def loadInitialWeights(self, session, path):
+        weights_dict = np.load(path).item()
         for op_name in weights_dict:
             tmp_name1 = op_name.split('_', 1)[0]
             tmp_name2 = tmp_name1.split('-', 1)[0]
@@ -47,7 +46,6 @@ class FullConvAlexnet(object):
                 else:
                     var = tf.get_variable('weights', trainable=False)
                     if tmp_name2 == 'fc6':
-                        print data.shape
                         session.run(var.assign(data.reshape([6,6,256,4096])))
                     elif tmp_name2 in ['fc7', 'fc8']:
                         session.run(var.assign(data.reshape([1,1]+list(data.shape))))
@@ -55,11 +53,11 @@ class FullConvAlexnet(object):
                         session.run(var.assign(data))
 
     # Create Convolutional layer, to split computation use groups > 1
-    def conv(self, x, filter_height, filter_width, num_filters, stride_y, stride_x, name, padding='SAME', groups=1):
+    def conv(self, x, filter_height, filter_width, num_filters, stride_y, stride_x, name, padding='SAME', groups=1, reuse=True):
         input_channels = int(x.get_shape()[-1])
         convolve = lambda i, k: tf.nn.conv2d(i, k, strides=[1, stride_y, stride_x, 1], padding=padding)
 
-        with tf.variable_scope(name) as scope:
+        with tf.variable_scope(name, reuse=reuse) as scope:
             weights = tf.get_variable('weights', shape=[filter_height, filter_width, input_channels/groups, num_filters])
             biases = tf.get_variable('biases', shape=[num_filters])
 
@@ -79,8 +77,8 @@ class FullConvAlexnet(object):
             return relu
 
     # Create Fully-connected Layer
-    def fc(self, x, num_in, num_out, name ,relu=True):
-        with tf.variable_scope(name) as scope:
+    def fc(self, x, num_in, num_out, name, relu=True, reuse=True):
+        with tf.variable_scope(name, reuse=reuse) as scope:
             weights = tf.get_variable('weights', shape=[num_in, num_out], trainable=True)
             biases = tf.get_variable('biases', shape=[num_out], trainable=True)
 
