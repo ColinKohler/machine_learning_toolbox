@@ -5,7 +5,7 @@ import numpy as np
 WEIGHTS_PATH = '/home/colin/workspace/machine_learning_toolbox/alexnet_tf/bvlc_alexnet.npy'
 
 class Alexnet(object):
-    def __init__(self, x, keep_prob, output_num, lr=None, y=None, skip_layer=list(), train=True):
+    def __init__(self, x, keep_prob, output_num, lr=None, y=None, skip_layer=list(), train=True, full_conv=False, reuse=False):
         self.x = x
         self.y = y
         self.lr = lr
@@ -14,10 +14,11 @@ class Alexnet(object):
         self.output_num = output_num
         self.weights = dict()
         self.train = train
+        self.reuse = reuse
 
-        self.createModel()
+        self.createModel(full_conv)
 
-    def createModel(self):
+    def createModel(self, full_conv):
         conv1 = self.conv(self.x, 11, 11, 96, 4, 4, padding='VALID', name='conv1')
         pool1 = self.max_pool(conv1, 3, 3, 2, 2, padding='VALID', name='pool1')
         norm1 = self.lrn(pool1, 2, 2e-05, 0.75, name='norm1')
@@ -32,14 +33,19 @@ class Alexnet(object):
         conv5 = self.conv(conv4, 3, 3, 256, 1, 1, groups=2, name='conv5')
         pool5 = self.max_pool(conv5, 3, 3, 2, 2, padding='VALID', name='pool5')
 
-        flattened = tf.reshape(pool5, [-1, 6*6*256])
-        fc6 = self.fc(flattened, 6*6*256, 4096, name='fc6')
-        dropout6 = self.dropout(fc6, self.keep_prob)
-
-        fc7 = self.fc(dropout6, 4096, 4096, name='fc7')
-        dropout7 = self.dropout(fc7, self.keep_prob)
-
-        self.fc8 = self.fc(dropout7, 4096, self.output_num, relu=False, name='fc8')
+        if full_conv:
+            conv6 = self.fc_conv(pool5, 6, 6, 4096, name='fc6')
+            conv7 = self.fc_conv(conv6, 1, 1, 4096, name='fc7')
+            self.conv8 = self.fc_conv(conv7, 1, 1, self.output_num, name='fc8')
+            self.output = self.conv8
+        else:
+            flattened = tf.reshape(pool5, [-1, 6*6*256])
+            fc6 = self.fc(flattened, 6*6*256, 4096, name='fc6')
+            dropout6 = self.dropout(fc6, self.keep_prob)
+            fc7 = self.fc(dropout6, 4096, 4096, name='fc7')
+            dropout7 = self.dropout(fc7, self.keep_prob)
+            self.fc8 = self.fc(dropout7, 4096, self.output_num, relu=False, name='fc8')
+            self.output = self.fc8
 
         if self.y is not None:
             # Evaluation op
@@ -81,7 +87,7 @@ class Alexnet(object):
         input_channels = int(x.get_shape()[-1])
         convolve = lambda i, k: tf.nn.conv2d(i, k, strides=[1, stride_y, stride_x, 1], padding=padding)
 
-        with tf.variable_scope(name) as scope:
+        with tf.variable_scope(name, reuse=self.reuse) as scope:
             weights = tf.get_variable('weights', shape=[filter_height, filter_width, input_channels/groups, num_filters])
             biases = tf.get_variable('biases', shape=[num_filters])
 
@@ -103,9 +109,26 @@ class Alexnet(object):
 
             return relu
 
+    # Converts a fully connected layer into a conv layer
+    def fc_conv(self, x, filter_height, filter_width, num_filters, name):
+        with tf.variable_scope(name, reuse=self.reuse) as scope:
+            in_shape = x.get_shape()
+            channels = int(in_shape[-1])
+            weights = tf.get_variable('weights', shape=[filter_height*filter_width*channels, num_filters])
+            biases = tf.get_variable('biases', shape=[num_filters])
+            reshape_weights = tf.reshape(weights, shape=[filter_height, filter_width, channels, num_filters])
+            conv = tf.nn.conv2d(x, reshape_weights, strides=[1,1,1,1], padding='VALID')
+            bias = tf.reshape(tf.nn.bias_add(conv, biases), conv.get_shape().as_list())
+            relu = tf.nn.relu(bias, name=scope.name)
+
+            self.weights[name+'_w'] = weights
+            self.weights[name+'_b'] = biases
+
+            return relu
+
     # Create Fully-connected Layer
-    def fc(self, x, num_in, num_out, name ,relu=True):
-        with tf.variable_scope(name) as scope:
+    def fc(self, x, num_in, num_out, name, relu=True):
+        with tf.variable_scope(name, reuse=self.reuse) as scope:
             weights = tf.get_variable('weights', shape=[num_in, num_out], trainable=True)
             biases = tf.get_variable('biases', shape=[num_out], trainable=True)
 

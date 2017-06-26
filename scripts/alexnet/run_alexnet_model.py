@@ -21,8 +21,6 @@ def test(args):
 
     # Init model and connect output to last layer
     model = Alexnet(x, keep_prob, num_classes, train=False)
-    output = model.fc8
-    pred = tf.argmax(output, 0)
     saver = tf.train.Saver()
 
     # Start TF session
@@ -32,13 +30,8 @@ def test(args):
         sess.run(tf.global_variables_initializer())
         saver.restore(sess, args.model_path)
 
-        best = sess.run(output, feed_dict={x : img.reshape([1, 227, 227, 3]), keep_prob : 1.0})
+        best = sess.run(model.output, feed_dict={x : img.reshape([1, 227, 227, 3]), keep_prob : 1.0})
         print best
-
-        w = dict()
-        for key in model.weights.keys():
-            w[key] = sess.run(model.weights[key])
-    np.save('trash_weights.npy', w)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
