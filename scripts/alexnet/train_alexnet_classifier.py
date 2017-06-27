@@ -5,7 +5,7 @@ import numpy as np
 import tensorflow as tf
 import argparse
 from datetime import datetime
-from alexnet_tf.alexnet import Alexnet
+from tensorflow_networks.alexnet import Alexnet
 from utils.rigor_percept_importer import RigorPerceptImporter
 
 def train(args):
@@ -19,9 +19,7 @@ def train(args):
     # Init tensorflow model
     x = tf.placeholder(tf.float32, [args.batch, 227, 227, 3])
     y = tf.placeholder(tf.float32, [None, num_output])
-    keep_prob = tf.placeholder(tf.float32)
-    model = Alexnet(x, keep_prob, num_output, y=y, lr=args.lr, skip_layer=args.finetune_layers)
-    output = model.fc8
+    model = Alexnet(x, num_output, y=y, lr=args.lr, train=True, skip_layer=args.finetune_layers)
 
     writer = tf.summary.FileWriter(args.tensorboard_path)
     saver = tf.train.Saver()
@@ -45,10 +43,10 @@ def train(args):
             # Train
             while step < train_batches_per_epoch:
                 batch_xs, batch_ys = train_importer.getBatch()
-                sess.run(model.train_op, feed_dict={x : batch_xs, y : batch_ys, keep_prob : args.dropout})
+                sess.run(model.train_op, feed_dict={x : batch_xs, y : batch_ys, model.keep_prob : args.dropout})
 
                 if step%args.log_step == 0:
-                    s = sess.run(model.merged_summary, feed_dict={x : batch_xs, y : batch_ys, keep_prob : 1.0})
+                    s = sess.run(model.merged_summary, feed_dict={x : batch_xs, y : batch_ys, model.keep_prob : 1.0})
                     writer.add_summary(s, epoch*train_batches_per_epoch + step)
 
                 step += 1
@@ -60,7 +58,7 @@ def train(args):
             test_count = 0
             for _ in range(val_batches_per_epoch):
                 tbatch_xs, tbatch_ys = val_importer.getBatch()
-                acc = sess.run(model.accuracy, feed_dict={x : tbatch_xs, y : tbatch_ys, keep_prob : 1.0})
+                acc = sess.run(model.accuracy, feed_dict={x : tbatch_xs, y : tbatch_ys, model.keep_prob : 1.0})
                 test_acc += acc
                 test_count += 1
 

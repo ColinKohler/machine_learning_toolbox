@@ -5,17 +5,18 @@ import numpy as np
 WEIGHTS_PATH = '/home/colin/workspace/machine_learning_toolbox/alexnet_tf/bvlc_alexnet.npy'
 
 class Alexnet(object):
-    def __init__(self, x, keep_prob, output_num, lr=None, y=None, skip_layer=list(), train=True, full_conv=False, reuse=False):
+    def __init__(self, x, output_num, lr=None, y=None, skip_layer=list(), train=False, full_conv=False, reuse=False):
         self.x = x
+        self.output_num = output_num
+        self.keep_prob = tf.placeholder(tf.float32)
         self.y = y
         self.lr = lr
-        self.keep_prob = keep_prob
-        self.skip_layer = skip_layer
-        self.output_num = output_num
-        self.weights = dict()
+
         self.train = train
+        self.skip_layer = skip_layer
         self.reuse = reuse
 
+        self.weights = dict()
         self.createModel(full_conv)
 
     def createModel(self, full_conv):

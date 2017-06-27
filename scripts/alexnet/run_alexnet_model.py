@@ -4,7 +4,7 @@ import tensorflow as tf
 import argparse
 import cv2
 import numpy as np
-from alexnet_tf.alexnet import Alexnet
+from tensorflow_networks.alexnet import Alexnet
 import utils.tf_utils as tf_utils
 
 def test(args):
@@ -17,10 +17,9 @@ def test(args):
 
     # TensorFlow stuff
     x = tf.placeholder(tf.float32, [1, 227, 227, 3])
-    keep_prob = tf.placeholder(tf.float32)
 
     # Init model and connect output to last layer
-    model = Alexnet(x, keep_prob, num_classes, train=False)
+    model = Alexnet(x, num_classes)
     saver = tf.train.Saver()
 
     # Start TF session
@@ -30,7 +29,7 @@ def test(args):
         sess.run(tf.global_variables_initializer())
         saver.restore(sess, args.model_path)
 
-        best = sess.run(model.output, feed_dict={x : img.reshape([1, 227, 227, 3]), keep_prob : 1.0})
+        best = sess.run(model.output, feed_dict={x : img.reshape([1, 227, 227, 3]), model.keep_prob : 1.0})
         print best
 
 if __name__ == '__main__':

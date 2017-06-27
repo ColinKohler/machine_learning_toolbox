@@ -7,7 +7,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 
-from alexnet_tf.alexnet import Alexnet
+from tensorflow_networks.alexnet import Alexnet
 import utils.tf_utils as tf_utils
 
 def run(args):
@@ -21,10 +21,9 @@ def run(args):
 
     # TensorFlow stuff
     x = tf.placeholder(tf.float32, [1, 451, 451, 3])
-    keep_prob = tf.placeholder(tf.float32)
 
     # Init model and connect output to last layer
-    model = Alexnet(x, keep_prob, num_classes, train=False, full_conv=True)
+    model = Alexnet(x, num_classes, full_conv=True)
     saver = tf.train.Saver()
 
     # Start TF session
@@ -34,7 +33,7 @@ def run(args):
         sess.run(tf.global_variables_initializer())
         saver.restore(sess, args.model_path)
 
-        best = sess.run(model.output, feed_dict={x : img.reshape([1, 451, 451, 3]), keep_prob : 1.0})
+        best = sess.run(model.output, feed_dict={x : img.reshape([1, 451, 451, 3]), model.keep_prob : 1.0})
         #print best[0].argmax(axis=2)
         best_cell = np.unravel_index(best[0,:,:,1].argmax(), [8,8])
         min_point = (best_cell[1] * 32, best_cell[0] * 32)
