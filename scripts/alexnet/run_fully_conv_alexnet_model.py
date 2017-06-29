@@ -12,7 +12,7 @@ import utils.tf_utils as tf_utils
 
 def run(args):
     img_size = 1219
-    mean = [ 128.26076557, 137.60922303, 142.49707287]
+    mean = [129.3506298, 138.39140291, 143.14869821]
     img = cv2.imread(args.image_path)
     rgb_img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     height, width, channels = img.shape
@@ -40,12 +40,9 @@ def run(args):
         cells = (img_size - 227) / 32 + 1
         best = sess.run(model.output, feed_dict={x : img.reshape([1, img_size, img_size, 3]), model.keep_prob : 1.0})
         trash_best = best[0,:,:,1] / np.max(best[0,:,:,1])
-        best_cells = np.where(trash_best == 1.00)
+        best_cells = np.where(trash_best == 1.0)
         best_cell = np.unravel_index(trash_best.argmax(), [cells,cells])
         min_point = (best_cell[1] * 32, best_cell[0] * 32)
-        print best_cell
-        print min_point
-        print
 
         sx = width / float(img_size)
         sy = height / float(img_size)

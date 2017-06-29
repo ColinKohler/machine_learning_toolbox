@@ -162,9 +162,10 @@ class ImageAugmenter(object):
     # Add jitteer to the RGB channels
     def addColorJitter(self, img, jitter_range, bbox=None):
         jitter = self._randIntInRange(jitter_range)
-        img[:,:,0] += np.uint8(jitter)
-        img[:,:,1] += np.uint8(jitter)
-        img[:,:,2] += np.uint8(jitter)
+        img[:,:,self._randIntInRange((0,3))] += np.uint8(jitter)
+        #img[:,:,0] += np.uint8(jitter)
+        #img[:,:,1] += np.uint8(jitter)
+        #img[:,:,2] += np.uint8(jitter)
 
         if bbox is not None:
             return img, bbox

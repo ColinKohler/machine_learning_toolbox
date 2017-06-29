@@ -11,8 +11,9 @@ from utils.rigor_percept_importer import RigorPerceptImporter
 def train(args):
     # Get training and validation data
     img_size = 227
-    mean = [ 128.26076557, 137.60922303, 142.49707287]
-    train_importer = RigorPerceptImporter(args.train_metadata_path, args.batch, img_size, mean, args.class_encoding_path)
+    mean = [137.1717115,  145.02209571, 147.46351853]
+    mean = [0,0,0]
+    train_importer = RigorPerceptImporter(args.train_metadata_path, args.batch, img_size, mean, args.class_encoding_path, augment=True)
     val_importer = RigorPerceptImporter(args.val_metadata_path, args.batch, img_size, mean, args.class_encoding_path)
     train_batches_per_epoch = np.floor(train_importer.num_percepts / args.batch).astype(np.int16)
     val_batches_per_epoch = np.floor(val_importer.num_percepts / args.batch).astype(np.int16)

@@ -2,10 +2,30 @@ import json
 import cv2
 import random
 import numpy as np
+from image_augmenter import ImageAugmenter
+import matplotlib.pyplot as plt
 
 class RigorPerceptImporter(object):
-    def __init__(self, metadata_path, batch_size, img_size, mean, class_encoding_path):
-        self.batch_size = batch_size
+    def __init__(self, metadata_path, batch_size, img_size, mean, class_encoding_path, augment=False):
+        self.augment = augment
+        if self.augment:
+            self.num_augs = 1
+            self.batch_size = batch_size
+            self.num_imgs_per_batch = self.batch_size / self.num_augs
+
+            self.augmenter = ImageAugmenter()
+            crop_range = [(0,50), (0,50), (0,50), (0,50)]
+            self.routine = [{'method' : self.augmenter.cropImageRandom,       'args' : [crop_range]},
+                            {'method' : self.augmenter.resizeImage,           'args' : [(256,256)]},
+                            {'method' : self.augmenter.cropImageRandomWindow, 'args' : [227]},
+                            {'method' : self.augmenter.flipImageLR,           'args' : [0.5]},
+                            {'method' : self.augmenter.addColorJitter,        'args' : [(0,2)]},
+                            {'method' : self.augmenter.transformImage,        'args' : [-5, 5, -15, 15]},
+                            {'method' : self.augmenter.addNoiseToImage,       'args' : [0.1, 0.1]}
+                            ]
+        else:
+            self.batch_size = batch_size
+            self.num_imgs_per_batch = batch_size
         self.mean = mean
         self.pointer = 0
         self.img_size = img_size
@@ -31,17 +51,27 @@ class RigorPerceptImporter(object):
 
     # Get the next batch
     def getBatch(self, domain=None):
-        batch_percepts = self.percepts[self.pointer:self.pointer + self.batch_size]
+        batch_percepts = self.percepts[self.pointer:self.pointer + self.num_imgs_per_batch]
+        self.pointer += self.num_imgs_per_batch
         labels = np.zeros([self.batch_size, self.num_classes])
         images = np.ndarray([self.batch_size, self.img_size, self.img_size, 3])
         for i, percept in enumerate(batch_percepts):
             # Load image
             img_path = percept['locator']
             img = cv2.imread(img_path.replace('file://', ''))
-            img = cv2.resize(img, (self.img_size, self.img_size))
-            img = img.astype(np.float32)
-            img -= self.mean
-            images[i] = img
+
+            if self.augment:
+                for j in range(self.num_augs):
+                    aug_img = self.augmenter.augmentImageWithConfig(img, self.routine)
+                    aug_img = cv2.resize(aug_img, (self.img_size, self.img_size))
+                    aug_img = aug_img.astype(np.float32)
+                    aug_img -= self.mean
+                    images[i*self.num_augs + j] = aug_img
+            else:
+                img = cv2.resize(img, (self.img_size, self.img_size))
+                img = img.astype(np.float32)
+                img -= self.mean
+                images[i] = img
 
             # Get annotation
             annotations = percept['annotations']

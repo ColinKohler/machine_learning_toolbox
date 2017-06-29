@@ -9,8 +9,10 @@ import utils.tf_utils as tf_utils
 
 def test(args):
     img = cv2.imread(args.image_path)
+    mean = [ 129.3506298, 138.39140291, 143.14869821]
     img = cv2.resize(img, (227, 227))
     img = img.astype(np.float32)
+    img -= mean
 
     one_hot_encoding = tf_utils.loadClassEncoding(args.class_encoding_path)
     num_classes = len(one_hot_encoding)
