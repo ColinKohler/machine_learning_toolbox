@@ -10,14 +10,16 @@ from utils.rigor_percept_importer import RigorPerceptImporter
 
 def train(args):
     # Get training and validation data
-    train_importer = RigorPerceptImporter(args.train_metadata_path, args.batch, [0.0, 0.0, 0.0], args.class_encoding_path)
-    val_importer = RigorPerceptImporter(args.val_metadata_path, args.batch, [0.0, 0.0, 0.0], args.class_encoding_path)
+    img_size = 227
+    mean = [ 128.26076557, 137.60922303, 142.49707287]
+    train_importer = RigorPerceptImporter(args.train_metadata_path, args.batch, img_size, mean, args.class_encoding_path)
+    val_importer = RigorPerceptImporter(args.val_metadata_path, args.batch, img_size, mean, args.class_encoding_path)
     train_batches_per_epoch = np.floor(train_importer.num_percepts / args.batch).astype(np.int16)
     val_batches_per_epoch = np.floor(val_importer.num_percepts / args.batch).astype(np.int16)
     num_output = train_importer.num_classes
 
     # Init tensorflow model
-    x = tf.placeholder(tf.float32, [args.batch, 227, 227, 3])
+    x = tf.placeholder(tf.float32, [args.batch, img_size, img_size, 3])
     y = tf.placeholder(tf.float32, [None, num_output])
     model = Alexnet(x, num_output, y=y, lr=args.lr, train=True, skip_layer=args.finetune_layers)
 

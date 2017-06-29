@@ -4,10 +4,11 @@ import random
 import numpy as np
 
 class RigorPerceptImporter(object):
-    def __init__(self, metadata_path, batch_size, mean, class_encoding_path):
+    def __init__(self, metadata_path, batch_size, img_size, mean, class_encoding_path):
         self.batch_size = batch_size
         self.mean = mean
         self.pointer = 0
+        self.img_size = img_size
 
         self.loadClassEncoding(class_encoding_path)
         self.readMetadata(metadata_path)
@@ -32,12 +33,12 @@ class RigorPerceptImporter(object):
     def getBatch(self, domain=None):
         batch_percepts = self.percepts[self.pointer:self.pointer + self.batch_size]
         labels = np.zeros([self.batch_size, self.num_classes])
-        images = np.ndarray([self.batch_size, 227, 227, 3])
+        images = np.ndarray([self.batch_size, self.img_size, self.img_size, 3])
         for i, percept in enumerate(batch_percepts):
             # Load image
             img_path = percept['locator']
             img = cv2.imread(img_path.replace('file://', ''))
-            img = cv2.resize(img, (227, 227))
+            img = cv2.resize(img, (self.img_size, self.img_size))
             img = img.astype(np.float32)
             img -= self.mean
             images[i] = img
@@ -49,7 +50,6 @@ class RigorPerceptImporter(object):
                 labels[i][self.one_hot_encoding[annotation['model']]] = 1.0
             elif annotation['model'] == 'trash.bag':
                 labels[i] = self.getBBoxFromAnnotation(annotation)
-
         return images, labels
 
     # Get the annotation with the given domain or the first annotation if no domain is given

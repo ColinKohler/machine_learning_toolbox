@@ -2,7 +2,7 @@ import sys
 import tensorflow as tf
 import numpy as np
 
-WEIGHTS_PATH = '/home/colin/workspace/machine_learning_toolbox/alexnet_tf/bvlc_alexnet.npy'
+WEIGHTS_PATH = '/home/colin/workspace/machine_learning_toolbox/tensorflow_networks/bvlc_alexnet.npy'
 
 class Alexnet(object):
     def __init__(self, x, output_num, lr=None, y=None, skip_layer=list(), train=False, full_conv=False, reuse=False):
@@ -40,8 +40,10 @@ class Alexnet(object):
             self.conv8 = self.fc_conv(conv7, 1, 1, self.output_num, name='fc8')
             self.output = self.conv8
         else:
-            flattened = tf.reshape(pool5, [-1, 6*6*256])
-            fc6 = self.fc(flattened, 6*6*256, 4096, name='fc6')
+            pool5_shape = pool5.get_shape()
+            fc6_size = int(pool5_shape[1]) * int(pool5_shape[2]) * int(pool5_shape[3])
+            flattened = tf.reshape(pool5, [-1, fc6_size])
+            fc6 = self.fc(flattened, fc6_size, 4096, name='fc6')
             dropout6 = self.dropout(fc6, self.keep_prob)
             fc7 = self.fc(dropout6, 4096, 4096, name='fc7')
             dropout7 = self.dropout(fc7, self.keep_prob)

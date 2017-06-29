@@ -10,13 +10,14 @@ import utils.tf_utils as tf_utils
 
 def testModel(args):
     batch = 128
-    one_hot_encoding = tf_utils.loadClassEncoding(args.class_encoding_path)
-    num_classes = len(one_hot_encoding)
-    test_importer = RigorPerceptImporter(args.test_metadata_path, batch, [0.0, 0.0, 0.0], args.class_encoding_path)
+    img_size = 227
+    mean = [ 128.26076557, 137.60922303, 142.49707287]
+    test_importer = RigorPerceptImporter(args.test_metadata_path, batch, img_size, mean, args.class_encoding_path)
     test_batches_per_epoch = np.floor(test_importer.num_percepts / batch).astype(np.int16)
+    num_classes = test_importer.num_classes
 
     # TensorFlow stuff
-    x = tf.placeholder(tf.float32, [batch, 227, 227, 3])
+    x = tf.placeholder(tf.float32, [batch, img_size, img_size, 3])
     y = tf.placeholder(tf.float32, [None, num_classes])
 
     # Init model and connect output to last layer
