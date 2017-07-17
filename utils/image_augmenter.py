@@ -107,10 +107,12 @@ class ImageAugmenter(object):
 
             if bbox is not None:
                 height, width, channels = img.shape
-                min_to_side = [width - bbox[0][0], bbox[0][1]]
-                max_to_side = [width - bbox[1][0], bbox[1][1]]
+                x1 = min(width - bbox[0][0], width)  # bbox[0][1]]
+                x2 = max(width - bbox[1][0], 0)      # bbox[1][1]]
 
-                return img, [min_to_side, max_to_side]
+                p1 = [min(x1, x2), bbox[0][1]]
+                p2 = [max(x1, x2), bbox[1][1]]
+                return img, [p1, p2]
             else:
                 return img
         else:
@@ -136,12 +138,12 @@ class ImageAugmenter(object):
         img = cv2.warpAffine(img, H, (height, width))
         if bbox is not None:
             min_bbox = H.dot(self._createHPoint(bbox[0]))
-            max_bbox = H.dot(self._createHPoint(bbox[1]))
-            min_bbox = [round(x) for x in min_bbox]
-            max_bbox = [round(x) for x in max_bbox]
-            bbox = [min_bbox, max_bbox]
+            min_bbox = [max(round(x), 0) for x in min_bbox]
 
-            return img, bbox
+            max_bbox = H.dot(self._createHPoint(bbox[1]))
+            max_bbox = [min(round(x), y) for x,y in zip(max_bbox, [width, height])]
+
+            return img, [min_bbox, max_bbox]
         else:
             return img
 
