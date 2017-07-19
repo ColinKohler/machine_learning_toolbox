@@ -24,10 +24,29 @@ class ObjectSegmenter(object):
 
     # Remove all points behind the object to isolate the workspace
     def _removePointsOutsideWorkspace(self, pt_cloud, dis_to_object):
+        # Y Filter
+        fil = pt_cloud.make_passthrough_filter()
+        fil.set_filter_field_name('y')
+        fil.set_filter_limits(0.0, 2.0)
+        pt_cloud = fil.filter()
+
+        # Z Filter
         fil = pt_cloud.make_passthrough_filter()
         fil.set_filter_field_name('z')
-        fil.set_filter_limits(0, dis_to_object)
-        return fil.filter()
+        fil.set_filter_limits(dis_to_object, dis_to_object+0.75)
+        pt_cloud = fil.filter()
+
+        # X Filter
+        n_cloud = np.asarray(pt_cloud)
+        x_min = np.min(n_cloud, axis=0)[0]
+        x_max = np.max(n_cloud, axis=0)[0]
+
+        fil = pt_cloud.make_passthrough_filter()
+        fil.set_filter_field_name('x')
+        fil.set_filter_limits(x_min+0.75, x_max-0.5)
+        pt_cloud = fil.filter()
+
+        return pt_cloud
 
     # Remove the floor points
     def _removeFloorPlane(self, pt_cloud):
